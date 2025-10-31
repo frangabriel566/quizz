@@ -1,8 +1,11 @@
-// =========================
-// script.js — 20 PERGUNTAS
-// =========================
+"use strict";
 
-// ----- PERGUNTAS (20) -----
+/* =========================================================
+   QUIZ — 20 perguntas + Nome do jogador + Resultados + Acessos
+   Com verificações de elementos e localStorage à prova de erro
+   ========================================================= */
+
+// ---------- PERGUNTAS (20) ----------
 const questions = [
     // 15 originais
     {
@@ -141,7 +144,7 @@ const questions = [
         ]
     },
 
-    // 5 difíceis (escolhidas)
+    // 5 difíceis
     {
         question: "Qual é o elemento químico com maior ponto de fusão?",
         answers: [
@@ -154,7 +157,7 @@ const questions = [
     {
         question: "Em matemática, qual o menor número primo de Mersenne conhecido gera um número perfeito?",
         answers: [
-            { id: 1, text: "3", correct: true }, // 2^2 - 1 = 3 -> perfeito 6
+            { id: 1, text: "3", correct: true },
             { id: 2, text: "5", correct: false },
             { id: 3, text: "7", correct: false },
             { id: 4, text: "13", correct: false },
@@ -189,97 +192,224 @@ const questions = [
     },
 ];
 
-// ----- DOM -----
-const loginSection = document.getElementById("login-section");
-const playerInput = document.getElementById("player-name");
-const startBtn = document.getElementById("start-btn");
-const playerBadge = document.getElementById("player-badge");
-const playerNameBadge = document.getElementById("player-name-badge");
+// ---------- DOM (com segurança) ----------
+const $ = (sel) => document.querySelector(sel);
 
-const quizSection = document.getElementById("quiz-section");
-const questionElement = document.getElementById("question");
-const answerButtons = document.getElementById("answer-buttons");
-const nextButton = document.getElementById("next-btn");
-const timerElement = document.getElementById("timer");
+// Se algum elemento não existir, o código ignora a parte correspondente
+const loginSection = $("#login-section");
+const playerInput = $("#player-name");
+const startBtn = $("#start-btn");
+const playerBadge = $("#player-badge");
+const playerNameBadge = $("#player-name-badge");
 
-const resultsBtn = document.getElementById("results-btn");
-const resultsSection = document.getElementById("results-section");
-const resultsTableBody = document.querySelector("#results-table tbody");
-const exportBtn = document.getElementById("export-btn");
-const clearBtn = document.getElementById("clear-btn");
+const quizSection = $("#quiz-section");
+const questionElement = $("#question");
+const answerButtons = $("#answer-buttons");
+const nextButton = $("#next-btn");
+const timerElement = $("#timer");
 
-// ----- Estado do Quiz -----
+const resultsBtn = $("#results-btn");
+const resultsSection = $("#results-section");
+const resultsTableBody = $("#results-table tbody");
+
+const exportBtn = $("#export-btn");
+const clearBtn = $("#clear-btn");
+
+const accessTableBody = $("#access-table tbody");
+const accessSummary = $("#access-summary");
+const exportAccessBtn = $("#export-access-btn");
+const clearAccessBtn = $("#clear-access-btn");
+
+// ---------- Estado ----------
 let currentQuestionIndex = 0;
 let score = 0;
 let timeLeft = 10;
 let timer = null;
 let isRestartMode = false;
 let playerName = "";
+let currentAccessId = null;
 
-// ----- Inicialização -----
-document.addEventListener("DOMContentLoaded", () => {
-    startBtn.addEventListener("click", handleStart);
-    nextButton.addEventListener("click", handleNextClick);
-    resultsBtn.addEventListener("click", toggleResults);
-    exportBtn.addEventListener("click", exportCSV);
-    clearBtn.addEventListener("click", clearResults);
-    renderResultsTable();
-});
+// ---------- Storage seguro ----------
+const STORAGE_RESULTS = "quizResults";
+const STORAGE_ACCESS = "quizAccessLog";
 
-function handleStart() {
-    const name = (playerInput.value || "").trim();
-    if (!name) {
-        playerInput.focus();
-        playerInput.style.borderColor = "#ef4444";
-        return;
+function safeGet(key, fallback) {
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+    } catch (e) {
+        console.warn("localStorage get falhou:", e);
+        return fallback;
     }
-    playerInput.style.borderColor = "#d1d5db";
-    playerName = name;
-
-    playerNameBadge.textContent = playerName;
-    playerBadge.classList.remove("hidden");
-    loginSection.classList.add("hidden");
-    quizSection.classList.remove("hidden");
-
-    startQuiz();
+}
+function safeSet(key, val) {
+    try {
+        localStorage.setItem(key, JSON.stringify(val));
+    } catch (e) {
+        console.warn("localStorage set falhou:", e);
+    }
 }
 
+// ---------- Utilidades ----------
+function escapeHTML(s = "") {
+    return s.replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
+}
+function formatDateTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString("pt-BR", {
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
+}
+function generateId() {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+function downloadCSV(rowsArray, filename) {
+    const csv = rowsArray.map(cols =>
+        cols.map(v => `"${String(v)}"`).join(",")
+    ).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// ---------- Acessos ----------
+function getAccessLog() { return safeGet(STORAGE_ACCESS, []); }
+function setAccessLog(list) { safeSet(STORAGE_ACCESS, list); }
+function logAccess() {
+    const list = getAccessLog();
+    const entry = { id: generateId(), name: null, timestamp: new Date().toISOString() };
+    list.push(entry);
+    setAccessLog(list);
+    return entry.id;
+}
+function updateAccessName(id, name) {
+    const list = getAccessLog();
+    const idx = list.findIndex(x => x.id === id);
+    if (idx >= 0) {
+        list[idx].name = name;
+        setAccessLog(list);
+    }
+}
+function renderAccessTable() {
+    if (!accessTableBody || !accessSummary) return; // se HTML não tem a seção, evita erro
+    const list = getAccessLog();
+    accessTableBody.innerHTML = "";
+    list.forEach((r, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>${escapeHTML(r.name || "Anônimo")}</td>
+      <td>${formatDateTime(r.timestamp)}</td>
+    `;
+        accessTableBody.appendChild(tr);
+    });
+    const total = list.length;
+    const names = new Set(list.filter(x => x.name && x.name.trim()).map(x => x.name.trim()));
+    accessSummary.textContent = `Total de acessos: ${total} • Nomes únicos: ${names.size}`;
+}
+function exportAccessCSV() {
+    const list = getAccessLog();
+    if (!list.length) return;
+    const header = ["#", "Nome", "Data/Hora ISO"];
+    const rows = list.map((r, i) => [i + 1, (r.name || "Anônimo").replace(/"/g, '""'), r.timestamp]);
+    downloadCSV([header, ...rows], "acessos_quiz.csv");
+}
+function clearAccess() {
+    if (!confirm("Limpar todos os registros de acessos deste navegador?")) return;
+    safeSet(STORAGE_ACCESS, []);
+    renderAccessTable();
+}
+
+// ---------- Resultados ----------
+function getResults() { return safeGet(STORAGE_RESULTS, []); }
+function saveResult(entry) {
+    const list = getResults();
+    list.push(entry);
+    safeSet(STORAGE_RESULTS, list);
+}
+function renderResultsTable() {
+    if (!resultsTableBody) return;
+    const list = getResults();
+    resultsTableBody.innerHTML = "";
+    list.forEach((r, idx) => {
+        const pct = ((r.score / r.total) * 100).toFixed(0) + "%";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>${escapeHTML(r.name)}</td>
+      <td>${r.score}</td>
+      <td>${r.total}</td>
+      <td>${pct}</td>
+      <td>${formatDateTime(r.timestamp)}</td>
+    `;
+        resultsTableBody.appendChild(tr);
+    });
+}
+function exportCSV() {
+    const list = getResults();
+    if (!list.length) return;
+    const header = ["#", "Nome", "Acertos", "Total", "Percentual", "Data/Hora ISO"];
+    const rows = list.map((r, i) => [
+        i + 1,
+        r.name.replace(/"/g, '""'),
+        r.score,
+        r.total,
+        ((r.score / r.total) * 100).toFixed(0) + "%",
+        r.timestamp
+    ]);
+    downloadCSV([header, ...rows], "resultados_quiz.csv");
+}
+function clearResults() {
+    if (!confirm("Limpar todos os resultados salvos neste navegador?")) return;
+    safeSet(STORAGE_RESULTS, []);
+    renderResultsTable();
+}
+
+// ---------- Quiz ----------
 function startQuiz() {
     currentQuestionIndex = 0;
     score = 0;
     isRestartMode = false;
-    nextButton.textContent = "Próxima";
-    nextButton.style.display = "none";
+    if (nextButton) {
+        nextButton.textContent = "Próxima";
+        nextButton.style.display = "none";
+    }
     showQuestion();
 }
-
 function showQuestion() {
+    if (!questionElement || !answerButtons) return;
     resetState();
-    const currentQuestion = questions[currentQuestionIndex];
-    const questionNo = currentQuestionIndex + 1;
-    questionElement.textContent = `${questionNo}. ${currentQuestion.question}`;
+    const current = questions[currentQuestionIndex];
+    questionElement.textContent = `${currentQuestionIndex + 1}. ${current.question}`;
     startTimer();
-
-    currentQuestion.answers.forEach((answer) => {
-        const button = document.createElement("button");
-        button.textContent = answer.text;
-        button.classList.add("btn");
-        button.dataset.correct = String(answer.correct);
-        button.addEventListener("click", selectAnswer);
-        answerButtons.appendChild(button);
+    current.answers.forEach((answer) => {
+        const btn = document.createElement("button");
+        btn.textContent = answer.text;
+        btn.classList.add("btn");
+        btn.dataset.correct = String(answer.correct);
+        btn.addEventListener("click", selectAnswer);
+        answerButtons.appendChild(btn);
     });
 }
-
 function resetState() {
-    nextButton.style.display = "none";
-    clearInterval(timer);
+    if (nextButton) nextButton.style.display = "none";
+    if (timer) clearInterval(timer);
     timer = null;
-    while (answerButtons.firstChild) {
-        answerButtons.removeChild(answerButtons.firstChild);
+    if (answerButtons) {
+        while (answerButtons.firstChild) answerButtons.removeChild(answerButtons.firstChild);
     }
 }
-
 function startTimer() {
+    if (!timerElement) return;
     timeLeft = 10;
     updateTimerLabel();
     timer = setInterval(() => {
@@ -292,24 +422,19 @@ function startTimer() {
         }
     }, 1000);
 }
-
 function updateTimerLabel() {
-    timerElement.textContent = `⏱️ Tempo: ${Math.max(timeLeft, 0)}s`;
+    if (timerElement) timerElement.textContent = `⏱️ Tempo: ${Math.max(timeLeft, 0)}s`;
 }
-
 function handleTimeout() {
     disableButtons();
-    timerElement.textContent = "⏰ Tempo esgotado!";
+    if (timerElement) timerElement.textContent = "⏰ Tempo esgotado!";
     setTimeout(() => goNextQuestion(), 700);
 }
-
 function selectAnswer(e) {
-    clearInterval(timer);
+    if (timer) clearInterval(timer);
     timer = null;
-
     const selectedBtn = e.currentTarget;
     const isCorrect = selectedBtn.dataset.correct === "true";
-
     if (isCorrect) {
         selectedBtn.classList.add("correct");
         score++;
@@ -317,29 +442,16 @@ function selectAnswer(e) {
         selectedBtn.classList.add("incorrect");
     }
     disableButtons();
-    nextButton.style.display = "block";
+    if (nextButton) nextButton.style.display = "block";
 }
-
 function disableButtons() {
+    if (!answerButtons) return;
     Array.from(answerButtons.children).forEach((button) => {
-        if (button.dataset.correct === "true") button.classList.add("correct");
-        button.disabled = true;
+        const btn = /** @type {HTMLButtonElement} */ (button);
+        if (btn.dataset.correct === "true") btn.classList.add("correct");
+        btn.disabled = true;
     });
 }
-
-function handleNextClick() {
-    if (isRestartMode) {
-        // Volta ao login para poder mudar o nome
-        loginSection.classList.remove("hidden");
-        quizSection.classList.add("hidden");
-        playerBadge.classList.add("hidden");
-        playerInput.value = "";
-        playerInput.focus();
-        return;
-    }
-    goNextQuestion();
-}
-
 function goNextQuestion() {
     currentQuestionIndex++;
     if (currentQuestionIndex < questions.length) {
@@ -348,114 +460,90 @@ function goNextQuestion() {
         showScore();
     }
 }
-
 function showScore() {
     resetState();
-    questionElement.textContent = `🎯 ${playerName}, você acertou ${score} de ${questions.length} perguntas!`;
-    timerElement.textContent = "";
-
+    if (questionElement) {
+        questionElement.textContent = `🎯 ${playerName || "Jogador"}, você acertou ${score} de ${questions.length} perguntas!`;
+    }
+    if (timerElement) timerElement.textContent = "";
     saveResult({
-        name: playerName,
-        score: score,
+        name: playerName || "Anônimo",
+        score,
         total: questions.length,
         timestamp: new Date().toISOString()
     });
     renderResultsTable();
-
-    nextButton.textContent = "Jogar novamente";
-    nextButton.style.display = "block";
-    isRestartMode = true;
-}
-
-// ----- Persistência e Tabela -----
-const STORAGE_KEY = "quizResults";
-
-function getResults() {
-    try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch {
-        return [];
+    if (nextButton) {
+        nextButton.textContent = "Jogar novamente";
+        nextButton.style.display = "block";
+        isRestartMode = true;
     }
 }
 
-function saveResult(entry) {
-    const list = getResults();
-    list.push(entry);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-}
+// ---------- Inicialização & Listeners (só se existirem) ----------
+document.addEventListener("DOMContentLoaded", () => {
+    // Log de acesso
+    currentAccessId = logAccess();
+    renderAccessTable();
+    renderResultsTable();
 
-function renderResultsTable() {
-    const list = getResults();
-    resultsTableBody.innerHTML = "";
-    list.forEach((r, idx) => {
-        const tr = document.createElement("tr");
-        const pct = ((r.score / r.total) * 100).toFixed(0) + "%";
-        const dt = formatDateTime(r.timestamp);
-        tr.innerHTML = `
-      <td>${idx + 1}</td>
-      <td>${escapeHTML(r.name)}</td>
-      <td>${r.score}</td>
-      <td>${r.total}</td>
-      <td>${pct}</td>
-      <td>${dt}</td>
-    `;
-        resultsTableBody.appendChild(tr);
-    });
-}
+    if (startBtn) {
+        startBtn.addEventListener("click", () => {
+            const name = (playerInput && playerInput.value || "").trim();
+            if (!name) {
+                if (playerInput) {
+                    playerInput.focus();
+                    playerInput.style.borderColor = "#ef4444";
+                }
+                return;
+            }
+            if (playerInput) playerInput.style.borderColor = "#d1d5db";
+            playerName = name;
 
-function toggleResults() {
-    resultsSection.classList.toggle("hidden");
-}
+            // Atualiza acesso com o nome informado
+            if (currentAccessId) updateAccessName(currentAccessId, playerName);
+            renderAccessTable();
 
-function exportCSV() {
-    const list = getResults();
-    if (!list.length) return;
+            if (playerNameBadge) playerNameBadge.textContent = playerName;
+            if (playerBadge) playerBadge.classList.remove("hidden");
+            if (loginSection) loginSection.classList.add("hidden");
+            if (quizSection) quizSection.classList.remove("hidden");
 
-    const header = ["#", "Nome", "Acertos", "Total", "Percentual", "Data/Hora ISO"];
-    const rows = list.map((r, i) => [
-        i + 1,
-        r.name.replace(/"/g, '""'),
-        r.score,
-        r.total,
-        ((r.score / r.total) * 100).toFixed(0) + "%",
-        r.timestamp
-    ]);
-
-    const csv = [header, ...rows].map(cols =>
-        cols.map(v => `"${String(v)}"`).join(",")
-    ).join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "resultados_quiz.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-function clearResults() {
-    if (confirm("Tem certeza que deseja limpar todos os resultados salvos neste navegador?")) {
-        localStorage.removeItem(STORAGE_KEY);
-        renderResultsTable();
+            startQuiz();
+        });
     }
-}
 
-// ----- Utilidades -----
-function escapeHTML(s = "") {
-    return s.replace(/[&<>"']/g, (c) =>
-        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
-    );
-}
+    if (nextButton) {
+        nextButton.addEventListener("click", () => {
+            if (isRestartMode) {
+                // volta ao login para trocar nome, se quiser
+                if (loginSection) loginSection.classList.remove("hidden");
+                if (quizSection) quizSection.classList.add("hidden");
+                if (playerBadge) playerBadge.classList.add("hidden");
+                if (playerInput) {
+                    playerInput.value = "";
+                    playerInput.focus();
+                }
+                isRestartMode = false;
+                return;
+            }
+            goNextQuestion();
+        });
+    }
 
-function formatDateTime(iso) {
-    const d = new Date(iso);
-    return d.toLocaleString("pt-BR", {
-        year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", second: "2-digit"
-    });
-}
+    if (resultsBtn && resultsSection) {
+        resultsBtn.addEventListener("click", () => {
+            resultsSection.classList.toggle("hidden");
+        });
+    }
+
+    if (exportBtn) exportBtn.addEventListener("click", exportCSV);
+    if (clearBtn) clearBtn.addEventListener("click", clearResults);
+
+    if (exportAccessBtn) exportAccessBtn.addEventListener("click", exportAccessCSV);
+    if (clearAccessBtn) clearAccessBtn.addEventListener("click", clearAccess);
+});
+
+
 
 
