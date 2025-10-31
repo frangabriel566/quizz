@@ -1,36 +1,151 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quiz Cronometrado</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; display:flex; min-height:100vh; align-items:center; justify-content:center; }
-    .app { background:#fff; width:95%; max-width:680px; padding:28px; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.08); }
-    h1 { margin:0 0 8px; }
-    .row { display:flex; gap:10px; align-items:center; margin-bottom:14px; }
-    .row input { flex:1; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; }
-    .btn, .next-btn, .ghost-btn {
-      background:#3498db; color:#fff; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; transition:.2s;
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      display: flex;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
     }
-    .btn:hover, .next-btn:hover { filter:brightness(.95); }
-    .btn { width:100%; text-align:left; }
-    .btn.correct { background:#2ecc71; color:#fff; }
-    .btn.incorrect { background:#e74c3c; color:#fff; }
-    .btn-container { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
-    .next-btn { background:#2c3e50; margin-top:16px; display:none; }
-    #timer { display:inline-block; font-weight:700; color:#e74c3c; background:#fff3f3; padding:6px 10px; border-radius:10px; margin:6px 0 12px; }
-    .topbar { display:flex; justify-content:space-between; align-items:center; gap:10px; }
-    .ghost-btn { background:transparent; color:#374151; border:1px solid #d1d5db; }
-    .hidden { display:none; }
+
+    .app {
+      background: #fff;
+      width: 95%;
+      max-width: 680px;
+      padding: 28px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .row input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+    }
+
+    .btn,
+    .next-btn,
+    .ghost-btn {
+      background: #3498db;
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: .2s;
+    }
+
+    .btn:hover,
+    .next-btn:hover {
+      filter: brightness(.95);
+    }
+
+    .btn {
+      width: 100%;
+      text-align: left;
+    }
+
+    .btn.correct {
+      background: #2ecc71;
+      color: #fff;
+    }
+
+    .btn.incorrect {
+      background: #e74c3c;
+      color: #fff;
+    }
+
+    .btn-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .next-btn {
+      background: #2c3e50;
+      margin-top: 16px;
+      display: none;
+    }
+
+    #timer {
+      display: inline-block;
+      font-weight: 700;
+      color: #e74c3c;
+      background: #fff3f3;
+      padding: 6px 10px;
+      border-radius: 10px;
+      margin: 6px 0 12px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ghost-btn {
+      background: transparent;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+
+    .hidden {
+      display: none;
+    }
 
     /* Tabelas */
-    #results-section { margin-top:22px; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:left; }
-    th { background:#f9fafb; font-weight:600; }
-    .player-badge { font-size:14px; color:#374151; background:#eef2ff; border:1px solid #c7d2fe; padding:4px 8px; border-radius:999px; }
+    #results-section {
+      margin-top: 22px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+    }
+
+    th {
+      background: #f9fafb;
+      font-weight: 600;
+    }
+
+    .player-badge {
+      font-size: 14px;
+      color: #374151;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      padding: 4px 8px;
+      border-radius: 999px;
+    }
   </style>
 </head>
 
@@ -58,6 +173,15 @@
       <button id="next-btn" class="next-btn">Próxima</button>
     </div>
 
+    <!-- NOVO: Mensagem final (após terminar e travar) -->
+    <div id="final-section" class="hidden">
+      <h2 id="final-message" style="margin-top:0;">Obrigado por participar!</h2>
+      <p id="final-subtitle" style="color:#374151"></p>
+      <p style="font-size:14px;color:#6b7280;">
+        *Este navegador está bloqueado para novas tentativas.*
+      </p>
+    </div>
+
     <!-- Resultados (tabela para o criador) -->
     <div id="results-section" class="hidden">
       <h3>Resultados registrados neste navegador</h3>
@@ -83,7 +207,7 @@
 
       <hr style="margin:18px 0; border:none; border-top:1px solid #e5e7eb;" />
 
-      <!-- NOVO: Acessos à página -->
+      <!-- Acessos à página (este navegador) -->
       <h3>Acessos à página (este navegador)</h3>
       <div style="overflow:auto;">
         <table id="access-table">
@@ -108,4 +232,5 @@
   <!-- Use defer para evitar erros de DOM nulo -->
   <script src="script.js" defer></script>
 </body>
+
 </html>
