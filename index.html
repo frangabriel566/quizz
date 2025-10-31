@@ -4,22 +4,197 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quiz</title>
+  <title>Quiz Cronometrado</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      display: flex;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .app {
+      background: #fff;
+      width: 95%;
+      max-width: 680px;
+      padding: 28px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .row input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+    }
+
+    .btn,
+    .next-btn,
+    .ghost-btn {
+      background: #3498db;
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: .2s;
+    }
+
+    .btn:hover,
+    .next-btn:hover {
+      filter: brightness(.95);
+    }
+
+    .btn {
+      width: 100%;
+      text-align: left;
+    }
+
+    .btn.correct {
+      background: #2ecc71;
+      color: #fff;
+    }
+
+    .btn.incorrect {
+      background: #e74c3c;
+      color: #fff;
+    }
+
+    .btn-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .next-btn {
+      background: #2c3e50;
+      margin-top: 16px;
+      display: none;
+    }
+
+    #timer {
+      display: inline-block;
+      font-weight: 700;
+      color: #e74c3c;
+      background: #fff3f3;
+      padding: 6px 10px;
+      border-radius: 10px;
+      margin: 6px 0 12px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ghost-btn {
+      background: transparent;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    /* Resultados */
+    #results-section {
+      margin-top: 22px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+    }
+
+    th {
+      background: #f9fafb;
+      font-weight: 600;
+    }
+
+    .player-badge {
+      font-size: 14px;
+      color: #374151;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      padding: 4px 8px;
+      border-radius: 999px;
+    }
+  </style>
 </head>
 
 <body>
   <div class="app">
-    <h1>Quiz</h1>
-    <div class="quiz">
+    <div class="topbar">
+      <h1>🧠 Quiz Cronometrado</h1>
+      <button id="results-btn" class="ghost-btn" type="button">Resultados</button>
+    </div>
+
+    <!-- Área de identificação do jogador -->
+    <div id="login-section" class="row">
+      <input id="player-name" type="text" placeholder="Seu nome para registrar o resultado" />
+      <button id="start-btn" class="next-btn" type="button" style="display:block;">Começar</button>
+    </div>
+
+    <!-- Badge com o nome do jogador -->
+    <div id="player-badge" class="player-badge hidden">Jogador: <span id="player-name-badge"></span></div>
+
+    <!-- Área do Quiz -->
+    <div id="quiz-section" class="quiz hidden">
+      <div id="timer">⏱️ Tempo: 10s</div>
       <h2 id="question">A pergunta aparecerá aqui</h2>
-      <div id="answer-buttons" class="btn-container">
-        <button class="btn">Resposta 1</button>
-        <button class="btn">Resposta 2</button>
-        <button class="btn">Resposta 3</button>
-        <button class="btn">Resposta 4</button>
-      </div>
+      <div id="answer-buttons" class="btn-container"></div>
       <button id="next-btn" class="next-btn">Próxima</button>
+    </div>
+
+    <!-- Resultados (tabela para o criador) -->
+    <div id="results-section" class="hidden">
+      <h3>Resultados registrados neste navegador</h3>
+      <div style="overflow:auto;">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nome</th>
+              <th>Acertos</th>
+              <th>Total</th>
+              <th>%</th>
+              <th>Data/Hora</th>
+            </tr>
+          </thead>
+          <tbody><!-- linhas geradas via JS --></tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <button id="export-btn" class="ghost-btn" type="button">Exportar CSV</button>
+        <button id="clear-btn" class="ghost-btn" type="button">Limpar resultados</button>
+      </div>
     </div>
   </div>
 
@@ -27,3 +202,4 @@
 </body>
 
 </html>
+
